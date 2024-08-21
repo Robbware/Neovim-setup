@@ -37,7 +37,7 @@ return {
 				"emmet_ls",
 				"prismals",
 				"pyright",
-				"omnisharp",
+				"gopls",
 			},
 		})
 
@@ -49,7 +49,6 @@ return {
 				"black",
 				"pylint",
 				"eslint_d",
-				"csharpier",
 			},
 		})
 	end,
