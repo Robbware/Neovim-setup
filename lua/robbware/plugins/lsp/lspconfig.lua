@@ -106,11 +106,11 @@ return {
 					on_attach = function(client, bufnr)
 						-- Enable keymaps for LSP features
 						local bufopts = { noremap = true, silent = true, buffer = bufnr }
-						vim.api.nvim_buf_set_keymap(bufnr, "n", "gd", ":lua vim.lsp.buf.definition()<CR>", bufopts)
-						vim.api.nvim_buf_set_keymap(bufnr, "n", "K", ":lua vim.lsp.buf.hover()<CR>", bufopts)
-						vim.api.nvim_buf_set_keymap(bufnr, "n", "gi", ":lua vim.lsp.buf.implementation()<CR>", bufopts)
-						vim.api.nvim_buf_set_keymap(bufnr, "n", "gr", ":lua vim.lsp.buf.references()<CR>", bufopts)
-						vim.api.nvim_buf_set_keymap(bufnr, "n", "rn", ":lua vim.lsp.buf.rename()<CR>", bufopts)
+						vim.keymap.set("n", "gd", vim.lsp.buf.definition, bufopts)
+						vim.keymap.set("n", "K", vim.lsp.buf.hover, bufopts)
+						vim.keymap.set("n", "gi", vim.lsp.buf.implementation, bufopts)
+						vim.keymap.set("n", "gr", vim.lsp.buf.references, bufopts)
+						vim.keymap.set("n", "rn", vim.lsp.buf.rename, bufopts)
 					end,
 					flags = {
 						debounce_text_changes = 150,
