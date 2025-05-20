@@ -23,6 +23,10 @@ return {
 					package_uninstalled = "✗",
 				},
 			},
+			registries = {
+				"github:mason-org/mason-registry",
+				"github:Crashdummyy/mason-registry",
+			},
 		})
 
 		mason_lspconfig.setup({
@@ -40,8 +44,10 @@ return {
 				--				"pyright",
 				"gopls",
 				"omnisharp",
+				-- "omnisharp-mono",
 				--"csharp_ls",
 			},
+			automatic_enable = true,
 		})
 
 		mason_tool_installer.setup({

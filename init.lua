@@ -19,3 +19,22 @@ vim.lsp.handlers["textDocument/publishDiagnostics"] =
 		signs = true,
 		update_in_insert = false,
 	})
+
+-- Auto-kill OmniSharp server on exit for Windows
+vim.api.nvim_create_autocmd("VimLeave", {
+	pattern = "*",
+	callback = function()
+		-- Get current Neovim PID
+		local nvim_pid = vim.fn.getpid()
+
+		-- Find and kill the OmniSharp process associated with this Neovim instance using PowerShell
+		local kill_cmd = string.format(
+			'powershell -Command "Get-CimInstance Win32_Process | '
+				.. "Where-Object {$_.Name -like '*OmniSharp*' -and $_.CommandLine -like '*%d*'} | "
+				.. 'ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}"',
+			nvim_pid
+		)
+		vim.fn.system(kill_cmd)
+	end,
+	desc = "Kill OmniSharp server when exiting Neovim on Windows",
+})

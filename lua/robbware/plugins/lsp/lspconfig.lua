@@ -2,10 +2,11 @@ return {
 	"neovim/nvim-lspconfig",
 	event = { "BufReadPre", "BufNewFile" },
 	dependencies = {
-		--		"Hoffs/omnisharp-extended-lsp.nvim",
+		"Hoffs/omnisharp-extended-lsp.nvim",
 		"hrsh7th/cmp-nvim-lsp",
 		{ "antosha417/nvim-lsp-file-operations", config = true },
 		{ "folke/neodev.nvim", opts = {} },
+		"tris203/rzls.nvim",
 	},
 	config = function()
 		-- import lspconfig plugin
@@ -79,118 +80,111 @@ return {
 			vim.fn.sign_define(hl, { text = icon, texthl = hl, numhl = "" })
 		end
 
+		local data_path = vim.fn.stdpath("data")
+		local install_dir = data_path .. "/mason/packages/omnisharp"
+		local bin_name = vim.loop.os_uname().sysname == "Windows_NT" and "\\OmniSharp.exe" or "/OmniSharp"
+		local omnisharp_cmd = install_dir .. bin_name
+
+		-- Warn if missing
+		if vim.fn.filereadable(omnisharp_cmd) == 0 then
+			vim.notify("Could not find OmniSharp binary at: " .. omnisharp_cmd, vim.log.levels.ERROR)
+			return
+		end
+
+		-- vim.filetype.add({
+		-- 	extension = {
+		-- 		cshtml = "razor",
+		-- 		razor = "razor",
+		-- 	},
+		-- })
+		--
+		-- -- Set up highlighting for Razor files
+		-- vim.api.nvim_create_autocmd({ "BufNewFile", "BufRead" }, {
+		-- 	pattern = { "*.cshtml", "*.razor" },
+		-- 	callback = function()
+		-- 		vim.bo.filetype = "razor"
+		-- 		-- Enable both HTML and C# syntax highlighting
+		-- 		vim.cmd("runtime! syntax/html.vim")
+		-- 		vim.cmd("runtime! syntax/cs.vim")
+		-- 	end,
+		-- })
+
+		-- require("lspconfig").omnisharp.setup({
+		-- 	cmd = { omnisharp_cmd, "--languageserver", "--hostPID", tostring(vim.fn.getpid()) },
+		-- 	capabilities = require("cmp_nvim_lsp").default_capabilities(),
+		-- 	filetypes = { "cs", "vb", "cshtml" },
+		-- 	root_dir = function(fname)
+		-- 		return lspconfig.util.root_pattern("*.sln", "*.csproj")(fname)
+		-- 	end,
+		-- 	settings = {
+		-- 		MsBuild = {
+		-- 			LoadProjectsOnDemand = false,
+		-- 		},
+		-- 		RoslynExtensionsOptions = {
+		-- 			EnableDecompilationSupport = true,
+		-- 			EnableImportCompletion = true,
+		-- 			EnableAsyncCompletion = true,
+		-- 			EnableAnalyzersSupport = true,
+		-- 		},
+		-- 		FormattingOptions = {
+		-- 			EnableEditorConfigSupport = true,
+		-- 		},
+		-- 	},
+		-- })
+
+		local mason_registry = require("mason-registry")
+
+		---@type string[]
+		local cmd = {}
+
+		local roslyn_package = mason_registry.get_package("roslyn")
+		if roslyn_package:is_installed() then
+			vim.list_extend(cmd, {
+				"roslyn",
+				"--stdio",
+				"--logLevel=Information",
+				"--extensionLogDirectory=" .. vim.fs.dirname(vim.lsp.get_log_path()),
+			})
+
+			local rzls_package = mason_registry.get_package("rzls")
+			if rzls_package:is_installed() then
+				local rzls_path = vim.fn.expand("$MASON/packages/rzls/libexec")
+				table.insert(
+					cmd,
+					"--razorSourceGenerator=" .. vim.fs.joinpath(rzls_path, "Microsoft.CodeAnalysis.Razor.Compiler.dll")
+				)
+				table.insert(
+					cmd,
+					"--razorDesignTimePath="
+						.. vim.fs.joinpath(rzls_path, "Targets", "Microsoft.NET.Sdk.Razor.DesignTime.targets")
+				)
+				vim.list_extend(cmd, {
+					"--extension",
+					vim.fs.joinpath(rzls_path, "RazorExtension", "Microsoft.VisualStudioCode.RazorExtension.dll"),
+				})
+			end
+		end
+
+		require("roslyn").setup({
+			cmd = cmd,
+			config = {
+				-- the rest of your Roslyn configuration
+				handlers = require("rzls.roslyn_handlers"),
+			},
+		})
+
+		require("lspconfig").html.setup({
+			capabilities = capabilities,
+			filetypes = { "html", "razor", "cshtml" },
+		})
+
 		--		local rounded_borders = {
 		--			["textDocument/hover"] = vim.lsp.with(vim.lsp.handlers.hover, { border = "rounded" }),
 		--			["textDocument/signatureHelp"] = vim.lsp.with(vim.lsp.handlers.signature_help, { border = "rounded" }),
 		--		}
 
-		local omnisharp_bin = "C:/Users/rober/AppData/Roaming/nvim/omnisharp-3/OmniSharp.dll"
+		--local omnisharp_bin = "C:/Users/rober/AppData/Roaming/nvim/omnisharp-3/OmniSharp.dll"
 
 		-- Lua Configuration for Neovim (init.lua)
-		mason_lspconfig.setup_handlers({
-			-- default handler for installed servers
-			function(server_name)
-				lspconfig[server_name].setup({
-					capabilities = capabilities,
-				})
-			end,
-			--["csharp_ls"] = function()
-			--	lspconfig.csharp_ls.setup({
-			--		capabilities = capabilities,
-			--	})
-			--end,
-			["omnisharp"] = function()
-				lspconfig.omnisharp.setup({
-					capabilities = capabilities,
-					cmd = { "dotnet", omnisharp_bin, "--languageserver", "--hostPID", tostring(vim.fn.getpid()) },
-					on_attach = function(client, bufnr)
-						-- Enable keymaps for LSP features
-						local bufopts = { noremap = true, silent = true, buffer = bufnr }
-						vim.keymap.set("n", "gd", vim.lsp.buf.definition, bufopts)
-						vim.keymap.set("n", "K", vim.lsp.buf.hover, bufopts)
-						vim.keymap.set("n", "gi", vim.lsp.buf.implementation, bufopts)
-						vim.keymap.set("n", "gr", vim.lsp.buf.references, bufopts)
-						vim.keymap.set("n", "rn", vim.lsp.buf.rename, bufopts)
-					end,
-					flags = {
-						debounce_text_changes = 150,
-					},
-					--					cmd = { "dotnet", omnisharp_bin },
-					root_dir = function(fname)
-						local primary = lspconfig.util.root_pattern("*.sln")(fname)
-						local fallback = lspconfig.util.root_pattern("*.csproj")(fname)
-						return primary or fallback
-					end,
-					settings = { -- Add settings here
-						omnisharp = {
-							wait_for_debugger = true,
-							enable_editorconfig_support = true,
-							enable_ms_build_load_projects_on_demand = false,
-							enable_roslyn_analyzers = true,
-							organize_imports_on_format = true,
-							enable_import_completion = true,
-							analyze_open_documents_only = false,
-							enable_decompilation_support = true,
-							filetypes = { "cs", "vb", "csproj", "sln", "slnx", "props", "csx", "targets" },
-						},
-					},
-				})
-			end,
-			-- ["svelte"] = function()
-			--   -- configure svelte server
-			--   lspconfig["svelte"].setup({
-			--     capabilities = capabilities,
-			--     on_attach = function(client, bufnr)
-			--       vim.api.nvim_create_autocmd("BufWritePost", {
-			--         pattern = { "*.js", "*.ts" },
-			--         callback = function(ctx)
-			--           -- Here use ctx.match instead of ctx.file
-			--           client.notify("$/onDidChangeTsOrJsFile", { uri = ctx.match })
-			--         end,
-			--       })
-			--     end,
-			--   })
-			-- end,
-			-- ["graphql"] = function()
-			--   -- configure graphql language server
-			--   lspconfig["graphql"].setup({
-			--     capabilities = capabilities,
-			--     filetypes = { "graphql", "gql", "svelte", "typescriptreact", "javascriptreact" },
-			--   })
-			-- end,
-			--			["emmet_ls"] = function()
-			-- configure emmet language server
-			--				lspconfig["emmet_ls"].setup({
-			--					capabilities = capabilities,
-			--					filetypes = {
-			--						"html",
-			--						"typescriptreact",
-			--						"javascriptreact",
-			--						"css",
-			--						"sass",
-			--						"scss",
-			--						"less",
-			--						"svelte",
-			--					},
-			--				})
-			--			end,
-			-- ["lua_ls"] = function()
-			-- 	-- configure lua server (with special settings)
-			-- 	lspconfig["lua_ls"].setup({
-			-- 		capabilities = capabilities,
-			-- 		settings = {
-			-- 			Lua = {
-			-- 				-- make the language server recognize "vim" global
-			-- 				diagnostics = {
-			-- 					globals = { "vim" },
-			-- 				},
-			-- 				completion = {
-			-- 					callSnippet = "Replace",
-			-- 				},
-			-- 			},
-			-- 		},
-			-- 	})
-			-- end,
-		})
 	end,
 }
